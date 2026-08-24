@@ -31,6 +31,20 @@ See [`PROTOCOL.md`](PROTOCOL.md) for the exact wire contract this
 implements, and [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) for the phased
 rollout this integration is being built against.
 
+## Prerequisites
+
+This integration only talks to *its own* Home Assistant instance's MQTT
+broker — it has no way to reach another instance's broker directly. For
+federation to actually work, every participating instance's broker needs
+to be bridged/federated with the others at the broker level, so that
+publishes under the shared topic prefix (e.g. `share/`) actually replicate
+between brokers. With Mosquitto, for example, that means a
+[bridge connection](https://mosquitto.org/documentation/mosquitto-conf/)
+forwarding both directions on that prefix (e.g. `topic share/# both 0`) —
+consult your broker's documentation for the equivalent. If every
+participating instance already publishes to the same single physical
+broker, there's nothing to set up here.
+
 ## Status
 
 Phase 1 + 1b (behavior-preserving blueprint port, plus native entity
@@ -86,7 +100,7 @@ Set up via the UI config flow:
 |---|---|---|
 | Bridge name | `Bridge Jakob` | Human-readable name; slugified into this bridge's identifier |
 | Entities to bridge | — | The entities to publish, any domain |
-| Shared discovery prefix | `share/homeassistant/` | The federation prefix all bridge instances publish to and read from |
+| Shared discovery prefix | `share/homeassistant/` | The federation prefix all bridge instances publish to and read from — must be bridged between brokers, see [Prerequisites](#prerequisites) |
 | Sensor value prefix | `share/jakob/` | Where this instance publishes its own entities' state values |
 | Full republish interval (minutes) | `1` | How often to refresh all retained messages |
 
