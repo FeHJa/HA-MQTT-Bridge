@@ -225,6 +225,16 @@ implementation — no manifest-based adapter is built or wired up. (Inbound
 message handling is covered by Phase 1b's acceptance criteria below, since
 it landed as an amendment before real-broker testing.)
 
+**Status: met, confirmed in real-world use.** Step 6's manual interop test
+happened for real, repeatedly, over weeks: multiple independent Home
+Assistant installs federate over a shared broker today, at least one still
+running the unmodified blueprint automation, with no behavior changes
+required on its side. This surfaced real bugs the test suite didn't catch
+(see Decisions 7-8 and Decision 9) — production usage ended up doing
+double duty as both the acceptance test and the bug-finding process
+originally planned as separate steps, which is the accepted testing
+strategy going forward (Decision 9).
+
 ### Phase 1b — Native entity creation for federated entities (pulled forward from Phase 3)
 
 Full rationale in `PROTOCOL.md` §5a. Landed before any real-broker testing,
@@ -309,8 +319,23 @@ present and unfixed, per §5a — this phase doesn't touch them.
   entry on removal, are now depublished (empty retained payload) rather
   than left as stale entities on other instances; see `PROTOCOL.md`
   §5b/`async_depublish_entity`.
-- `strings.json`/translations, `manifest.json` metadata for HACS
-  (`hacs.json`, versioning).
+- ~~`strings.json`/translations, `manifest.json` metadata for HACS
+  (`hacs.json`, versioning)~~ **Done**: config-flow/options/service strings
+  are all in `strings.json`/`translations/en.json`; `hacs.json` and
+  `manifest.json` are in place; the integration has shipped 8 versions
+  (`0.1.0` through `0.1.8`) through real releases.
+- ~~Rename to Saulach Bridge~~ **Done**: both the integration (`DOMAIN`,
+  package folder, class names, user-facing strings) and later the GitHub
+  repository itself were renamed from Grapevine to Saulach/Saulach Bridge.
+  Not originally planned in this document — driven by an external
+  branding decision partway through Phase 2. Required every existing
+  install's config entry to be recreated (HA has no migration path across
+  a domain change) — the recommended order was to remove the old entry
+  first (while the old domain's code could still run its depublish-on-
+  removal path), *then* upgrade, *then* recreate under the new domain
+  with the same `bridge_name` for wire continuity. See the note below
+  about a still-open loose end from installs that upgraded in the other
+  order.
 - ~~Diagnostics platform for support requests~~ **Done** (issue #12): closed
   together with a new metadata message (`PROTOCOL.md` §9) -- each bridge
   publishes its own protocol/integration/HA version, bridged entity count,
@@ -381,8 +406,25 @@ present and unfixed, per §5a — this phase doesn't touch them.
   winning and permanently hid the real version. `BridgedSensorEntity` no
   longer sets `sw_version` at all -- see `PROTOCOL.md` §9's new
   amendment.
-- Broaden test coverage (config flow, scheduler timing) toward CI.
-- `button` entity per config entry that calls `saulach.republish`.
+- **Under investigation:** a user's own old bridge identity (from before
+  the Saulach rename) reappearing locally even after `saulach.
+  depublish_bridge` was run against it from a peer's instance. Two
+  candidate explanations, not yet distinguished: (a) the peer's
+  depublish only cleared the topics *it* had discovered, leaving others
+  this instance knows about still retained, or (b) a genuine self-loop —
+  this instance's own current publish no longer matches the loop guard's
+  expected `bridge_id`/`unique_id` prefix (e.g. because `bridge_name`
+  changed across the rename), so it treats its own messages as a foreign
+  peer's and keeps re-materializing/re-publishing them every
+  `time_pattern` tick regardless of how many times anyone depublishes.
+  If (b) is confirmed, that's a real bug needing a fix at the loop-guard
+  level, not just a depublish; needs the reporting user to check whether
+  the reappeared device's entities keep updating live before this can be
+  scoped further.
+- **Declined:** a CI pipeline, a real-`homeassistant`/`pytest-homeassistant-
+  custom-component` test layer, and a `button` entity wrapper for
+  `saulach.republish` were all considered and dropped — not needed. See
+  Decision 9 for the testing-strategy call specifically.
 - **Multi-entry support** (lower priority — not currently needed, but
   worth designing for): allow multiple config entries so one HA install
   can run several bridge instances (e.g. against different brokers or
@@ -436,8 +478,9 @@ subscription model:
 ## Decisions
 
 1. **On-demand full republish trigger**: `services.yaml` service call
-   `saulach.republish` in Phase 1. The Phase 2 `button` entity
-   calls this same service rather than duplicating the republish logic.
+   `saulach.republish` in Phase 1. A Phase 2 `button` entity wrapper was
+   considered and declined — the service alone (Developer Tools → Actions)
+   is sufficient.
 2. **Minimum HA core version**: `2026.7`. `manifest.json`
    `"homeassistant"` requirement pinned accordingly; target the
    `mqtt` component's `async_subscribe`/`async_publish` API surface as of
@@ -499,6 +542,20 @@ subscription model:
    (raises if a callback returns something truthy and non-awaitable), so
    any future on_unload callback making the same mistake fails a test
    instead of only showing up in a user's log.
+9. **`pytest-homeassistant-custom-component`, and CI generally, declined —
+   production use is the accepted testing strategy.** Phase 1 step 5
+   originally planned a `pytest-homeassistant-custom-component` layer
+   beyond the pure-function/fake-harness suite specifically to catch
+   plumbing bugs (subscription lifecycle, blocking-call detection) the
+   fake harness can't model — it stayed a TODO in `requirements_test.txt`
+   through every release so far. In its place, real production use across
+   multiple federated instances found the same class of bug the real
+   framework was meant to catch (decisions 7 and 8 are both examples) —
+   later, in a user's log rather than in CI, but cheap to fix once found
+   (both were one-line fixes). Decided that trade is acceptable: no CI
+   pipeline, no real-`homeassistant` test dependency, no button-entity
+   Phase 2 filler — `pytest` against the fake harness plus production
+   usage is the testing strategy going forward, not an interim state.
 
 Phase 1 work can start directly from the file layout above, using
 `PROTOCOL.md` as the acceptance spec for each module.

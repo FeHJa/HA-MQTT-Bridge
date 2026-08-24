@@ -4,7 +4,8 @@
 
 **Peer-to-peer entity federation for Home Assistant.**
 
-**Version: 0.1** — pre-release, not yet tested against a real broker.
+**Version: 0.1.8** — in active production use, federating multiple real
+Home Assistant instances over a real MQTT broker.
 
 A native Home Assistant custom integration that bridges entities between
 independent Home Assistant instances over MQTT. It's a port of the
@@ -30,14 +31,37 @@ See [`PROTOCOL.md`](PROTOCOL.md) for the exact wire contract this
 implements, and [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) for the phased
 rollout this integration is being built against.
 
+## Prerequisites
+
+This integration only talks to *its own* Home Assistant instance's MQTT
+broker — it has no way to reach another instance's broker directly. For
+federation to actually work, every participating instance's broker needs
+to be bridged/federated with the others at the broker level, so that
+publishes under the shared topic prefix (e.g. `share/`) actually replicate
+between brokers. With Mosquitto, for example, that means a
+[bridge connection](https://mosquitto.org/documentation/mosquitto-conf/)
+forwarding both directions on that prefix (e.g. `topic share/# both 0`) —
+consult your broker's documentation for the equivalent. If every
+participating instance already publishes to the same single physical
+broker, there's nothing to set up here.
+
 ## Status
 
-This is Phase 1b of the migration plan: a behavior-preserving port of the
-blueprint's protocol, plus native entity creation for entities received
-from other bridges pulled forward from the plan's Phase 3. It has a
-lightweight fake-Home-Assistant test suite (`tests/`) but has **not yet
-been run against a real Home Assistant instance or a real MQTT broker**.
-Don't point it at production yet.
+Phase 1 + 1b (behavior-preserving blueprint port, plus native entity
+creation for received entities pulled forward from Phase 3) are complete
+and validated in real-world use: multiple independent Home Assistant
+installs, some still running the original blueprint automation, federate
+over a shared broker today without behavior changes on the blueprint side.
+Several real issues surfaced this way and were fixed (blocking I/O on
+setup, `device_class` mismatches crashing receivers, entity/device cleanup
+gaps, MQTT retained-message staleness) — see `MIGRATION_PLAN.md`'s
+Decisions section and `PROTOCOL.md`'s §5b/§5c/§9 amendments for the
+details.
+
+Acceptance testing happens by running this in production and fixing what
+breaks, rather than through a `pytest-homeassistant-custom-component`-based
+integration-test layer or a CI pipeline — both considered and declined,
+see `MIGRATION_PLAN.md` Decision 9.
 
 ## Installation
 
@@ -76,15 +100,20 @@ Set up via the UI config flow:
 |---|---|---|
 | Bridge name | `Bridge Jakob` | Human-readable name; slugified into this bridge's identifier |
 | Entities to bridge | — | The entities to publish, any domain |
-| Shared discovery prefix | `share/homeassistant/` | The federation prefix all bridge instances publish to and read from |
+| Shared discovery prefix | `share/homeassistant/` | The federation prefix all bridge instances publish to and read from — must be bridged between brokers, see [Prerequisites](#prerequisites) |
 | Sensor value prefix | `share/jakob/` | Where this instance publishes its own entities' state values |
 | Full republish interval (minutes) | `1` | How often to refresh all retained messages |
 
 ## Services
 
-`saulach.republish` — forces an immediate full discovery + state
-republish for a given bridge instance, without waiting for the next
-scheduled interval.
+- `saulach.republish` — forces an immediate full discovery + state
+  republish for a given bridge instance, without waiting for the next
+  scheduled interval.
+- `saulach.depublish_bridge` — permanently retracts every entity shown for
+  a peer bridge you've confirmed is dead (decommissioned, migrated, etc.),
+  so it stops reappearing on every restart. Manual and explicit only
+  (Developer Tools → Actions, device selector) — there's no automatic way
+  to tell a dead peer from a merely quiet one. See `PROTOCOL.md` §5c.
 
 ## Development
 

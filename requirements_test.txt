@@ -11,11 +11,8 @@ pytest>=8.0
 # tests/ha_stubs/homeassistant/__init__.py for what the stub does and does
 # not model.
 #
-# This is NOT a substitute for Phase 1's real acceptance testing
-# (MIGRATION_PLAN.md): before release, also run against actual Home
-# Assistant core with pytest-homeassistant-custom-component, and do the
-# manual interop test against a real broker + the blueprint automation
-# (MIGRATION_PLAN.md Phase 1 step 6). Add once a matching dev environment
-# is available:
-#   pytest-homeassistant-custom-component
-#   homeassistant>=2026.7
+# A pytest-homeassistant-custom-component/real-homeassistant test layer was
+# considered and declined (MIGRATION_PLAN.md Decision 9) -- production use
+# across multiple federated instances is the accepted acceptance-testing
+# strategy instead of a real-HA test dependency, not an interim measure
+# waiting on one.
