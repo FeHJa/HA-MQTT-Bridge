@@ -230,10 +230,10 @@ happened for real, repeatedly, over weeks: multiple independent Home
 Assistant installs federate over a shared broker today, at least one still
 running the unmodified blueprint automation, with no behavior changes
 required on its side. This surfaced real bugs the test suite didn't catch
-(see Decisions 7-8 and the `pytest-homeassistant-custom-component` gap
-below) — production usage ended up doing double duty as both the
-acceptance test and the bug-finding process originally planned as separate
-steps.
+(see Decisions 7-8 and Decision 9) — production usage ended up doing
+double duty as both the acceptance test and the bug-finding process
+originally planned as separate steps, which is the accepted testing
+strategy going forward (Decision 9).
 
 ### Phase 1b — Native entity creation for federated entities (pulled forward from Phase 3)
 
@@ -406,15 +406,6 @@ present and unfixed, per §5a — this phase doesn't touch them.
   winning and permanently hid the real version. `BridgedSensorEntity` no
   longer sets `sw_version` at all -- see `PROTOCOL.md` §9's new
   amendment.
-- **No CI pipeline** (open): `pytest` is run manually before each release;
-  there's no `.github/workflows/` at all. Broaden test coverage (config
-  flow, scheduler timing) and wire it into CI once one exists.
-- **Real-HA acceptance testing never adopted** (open, see the new Decision
-  entry below): Phase 1 planned `pytest-homeassistant-custom-component`
-  integration tests as a second test layer beyond the pure-function/fake-
-  harness suite; that dependency was never added, and production use has
-  been substituting for it instead (see Phase 1's acceptance-criteria
-  status note above).
 - **Under investigation:** a user's own old bridge identity (from before
   the Saulach rename) reappearing locally even after `saulach.
   depublish_bridge` was run against it from a peer's instance. Two
@@ -430,7 +421,10 @@ present and unfixed, per §5a — this phase doesn't touch them.
   level, not just a depublish; needs the reporting user to check whether
   the reappeared device's entities keep updating live before this can be
   scoped further.
-- `button` entity per config entry that calls `saulach.republish`.
+- **Declined:** a CI pipeline, a real-`homeassistant`/`pytest-homeassistant-
+  custom-component` test layer, and a `button` entity wrapper for
+  `saulach.republish` were all considered and dropped — not needed. See
+  Decision 9 for the testing-strategy call specifically.
 - **Multi-entry support** (lower priority — not currently needed, but
   worth designing for): allow multiple config entries so one HA install
   can run several bridge instances (e.g. against different brokers or
@@ -484,8 +478,9 @@ subscription model:
 ## Decisions
 
 1. **On-demand full republish trigger**: `services.yaml` service call
-   `saulach.republish` in Phase 1. The Phase 2 `button` entity
-   calls this same service rather than duplicating the republish logic.
+   `saulach.republish` in Phase 1. A Phase 2 `button` entity wrapper was
+   considered and declined — the service alone (Developer Tools → Actions)
+   is sufficient.
 2. **Minimum HA core version**: `2026.7`. `manifest.json`
    `"homeassistant"` requirement pinned accordingly; target the
    `mqtt` component's `async_subscribe`/`async_publish` API surface as of
@@ -547,21 +542,20 @@ subscription model:
    (raises if a callback returns something truthy and non-awaitable), so
    any future on_unload callback making the same mistake fails a test
    instead of only showing up in a user's log.
-9. **`pytest-homeassistant-custom-component` was never adopted, in
-   practice.** Phase 1 step 5 planned it as a second test layer beyond the
-   pure-function/fake-harness suite specifically to catch plumbing bugs
-   (subscription lifecycle, blocking-call detection) the fake harness
-   can't model. It stayed a documented TODO in `requirements_test.txt`
-   ("Add once a matching dev environment is available") through every
-   release so far. In its place, real production use across multiple
-   federated instances found the same class of bug the real framework was
-   meant to catch — decisions 7 and 8 are both examples — just later, in
-   a user's log rather than in CI, and only after already being shipped.
-   Cheaper to fix once found (both were one-line fixes), but this is a
-   standing risk, not a resolved one: the fake harness will keep missing
-   this bug class until a real `homeassistant` package is actually
-   available to test against. Worth revisiting if a suitable dev
-   environment becomes available, rather than continuing to accept it.
+9. **`pytest-homeassistant-custom-component`, and CI generally, declined —
+   production use is the accepted testing strategy.** Phase 1 step 5
+   originally planned a `pytest-homeassistant-custom-component` layer
+   beyond the pure-function/fake-harness suite specifically to catch
+   plumbing bugs (subscription lifecycle, blocking-call detection) the
+   fake harness can't model — it stayed a TODO in `requirements_test.txt`
+   through every release so far. In its place, real production use across
+   multiple federated instances found the same class of bug the real
+   framework was meant to catch (decisions 7 and 8 are both examples) —
+   later, in a user's log rather than in CI, but cheap to fix once found
+   (both were one-line fixes). Decided that trade is acceptable: no CI
+   pipeline, no real-`homeassistant` test dependency, no button-entity
+   Phase 2 filler — `pytest` against the fake harness plus production
+   usage is the testing strategy going forward, not an interim state.
 
 Phase 1 work can start directly from the file layout above, using
 `PROTOCOL.md` as the acceptance spec for each module.

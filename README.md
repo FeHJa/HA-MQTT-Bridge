@@ -44,15 +44,10 @@ gaps, MQTT retained-message staleness) — see `MIGRATION_PLAN.md`'s
 Decisions section and `PROTOCOL.md`'s §5b/§5c/§9 amendments for the
 details.
 
-**Known gap:** acceptance testing has happened by running this in
-production and fixing what broke, not through the
-`pytest-homeassistant-custom-component`-based integration tests originally
-planned for Phase 1 (see `requirements_test.txt`) — the dev sandbox this
-was built in can't install a real `homeassistant` package. Two of the bugs
-above (the blocking-I/O one, the `async_on_unload` truthy-return one) were
-specifically invisible to the hand-written fake test harness and only
-surfaced this way. There's also no CI pipeline yet — `pytest` is run
-manually before each release.
+Acceptance testing happens by running this in production and fixing what
+breaks, rather than through a `pytest-homeassistant-custom-component`-based
+integration-test layer or a CI pipeline — both considered and declined,
+see `MIGRATION_PLAN.md` Decision 9.
 
 ## Installation
 
