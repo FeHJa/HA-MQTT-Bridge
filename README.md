@@ -4,7 +4,8 @@
 
 **Peer-to-peer entity federation for Home Assistant.**
 
-**Version: 0.1** — pre-release, not yet tested against a real broker.
+**Version: 0.1.8** — in active production use, federating multiple real
+Home Assistant instances over a real MQTT broker.
 
 A native Home Assistant custom integration that bridges entities between
 independent Home Assistant instances over MQTT. It's a port of the
@@ -32,12 +33,26 @@ rollout this integration is being built against.
 
 ## Status
 
-This is Phase 1b of the migration plan: a behavior-preserving port of the
-blueprint's protocol, plus native entity creation for entities received
-from other bridges pulled forward from the plan's Phase 3. It has a
-lightweight fake-Home-Assistant test suite (`tests/`) but has **not yet
-been run against a real Home Assistant instance or a real MQTT broker**.
-Don't point it at production yet.
+Phase 1 + 1b (behavior-preserving blueprint port, plus native entity
+creation for received entities pulled forward from Phase 3) are complete
+and validated in real-world use: multiple independent Home Assistant
+installs, some still running the original blueprint automation, federate
+over a shared broker today without behavior changes on the blueprint side.
+Several real issues surfaced this way and were fixed (blocking I/O on
+setup, `device_class` mismatches crashing receivers, entity/device cleanup
+gaps, MQTT retained-message staleness) — see `MIGRATION_PLAN.md`'s
+Decisions section and `PROTOCOL.md`'s §5b/§5c/§9 amendments for the
+details.
+
+**Known gap:** acceptance testing has happened by running this in
+production and fixing what broke, not through the
+`pytest-homeassistant-custom-component`-based integration tests originally
+planned for Phase 1 (see `requirements_test.txt`) — the dev sandbox this
+was built in can't install a real `homeassistant` package. Two of the bugs
+above (the blocking-I/O one, the `async_on_unload` truthy-return one) were
+specifically invisible to the hand-written fake test harness and only
+surfaced this way. There's also no CI pipeline yet — `pytest` is run
+manually before each release.
 
 ## Installation
 
@@ -82,9 +97,14 @@ Set up via the UI config flow:
 
 ## Services
 
-`saulach.republish` — forces an immediate full discovery + state
-republish for a given bridge instance, without waiting for the next
-scheduled interval.
+- `saulach.republish` — forces an immediate full discovery + state
+  republish for a given bridge instance, without waiting for the next
+  scheduled interval.
+- `saulach.depublish_bridge` — permanently retracts every entity shown for
+  a peer bridge you've confirmed is dead (decommissioned, migrated, etc.),
+  so it stops reappearing on every restart. Manual and explicit only
+  (Developer Tools → Actions, device selector) — there's no automatic way
+  to tell a dead peer from a merely quiet one. See `PROTOCOL.md` §5c.
 
 ## Development
 
