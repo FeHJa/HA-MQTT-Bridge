@@ -406,6 +406,20 @@ present and unfixed, per §5a — this phase doesn't touch them.
   winning and permanently hid the real version. `BridgedSensorEntity` no
   longer sets `sw_version` at all -- see `PROTOCOL.md` §9's new
   amendment.
+- ~~Bridge crashes writing state when a remote entity reports
+  "unavailable"~~ **Done** (issue #27): a bridged entity's own source going
+  unavailable means the raw MQTT state payload is the literal string
+  `"unavailable"` (or `"unknown"`) -- writing that straight into
+  `native_value` crashed HA core's numeric coercion for any sensor with a
+  numeric `device_class`, since a non-`None` string value is always
+  assumed to be a real number. `BridgedSensorEntity.set_native_value` now
+  translates both sentinels into `native_value = None` plus the correct
+  `available` flag before writing state, matching how HA itself
+  distinguishes "no value" from "not available". See `PROTOCOL.md` §4's
+  new amendment. Caught in production, not by the test suite -- same
+  class of gap as Decision 9: the fake harness's `SensorEntity` stub
+  didn't model `available`/numeric-coercion at all until this fix added
+  it specifically to make the regression testable.
 - **Under investigation:** a user's own old bridge identity (from before
   the Saulach rename) reappearing locally even after `saulach.
   depublish_bridge` was run against it from a peer's instance. Two

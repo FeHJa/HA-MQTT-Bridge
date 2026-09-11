@@ -115,6 +115,21 @@ specific, entity.
 Raw state string only (no JSON wrapping), published retained to the state topic. Uses
 `trigger.to_state.state` on state-triggered publishes (cheaper than re-reading `states()`).
 
+**Amendment: receiving side must translate `unavailable`/`unknown` (issue #27).** A bridged
+entity's own source can legitimately go unavailable — `trigger.to_state.state` is then the
+literal string `"unavailable"` (HA's own sentinel), or `"unknown"`. This isn't a wire
+change (a compliant sender was always going to publish whatever `to_state.state` was, sentinel
+or not), but a receiving Saulach instance's native materialization (§5a) must not write that
+literal string into a native entity's value: Home Assistant only recognizes "no value" via
+`native_value = None`, and "not available" via the `available` property — never via a
+literal string equal to `"unavailable"`. A sensor with a numeric `device_class` (temperature,
+humidity, ...) assumes any non-`None` value is a real number, so writing the raw sentinel
+string crashed HA core's coercion. `BridgedSensorEntity.set_native_value` now maps
+`"unavailable"` → `native_value = None`, `available = False`, and `"unknown"` →
+`native_value = None`, `available = True` (still available, just no current reading), before
+ever calling `async_write_ha_state()` — a purely local, receiving-side interpretation, same
+shape as §5a/§9's other receiving-side amendments.
+
 ## 5. Incoming discovery handling (federation from other instances)
 
 - Subscribe to `{shared_discovery_prefix}+/+/config` (the blueprint hardcodes this as a
